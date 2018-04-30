@@ -1,0 +1,8 @@
+"virtualMachineName" = "qlik-sense"
+"adminUsername" = "qlik"
+"adminPassword" = "Sense1234"
+"dnsLabelPrefix" = "tf-qliksense"
+"qlikSenseVersion" = "Qlik Sense November 2017"
+"qlikSenseServiceAccount" = "qService"
+"qlikSenseServiceAccountPassword" = "Sense1234"
+"qlikSenseRepositoryPassword" = "Sense1234"

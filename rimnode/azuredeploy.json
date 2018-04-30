@@ -1,0 +1,181 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Username for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "dnsNameForPublicIP": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Globally unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "serviceUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Username for the Sense service account."
+      }
+    },
+    "servicePassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Password for the Sense service account."
+      }
+    },
+    "hostname": {
+      "type": "string",
+      "metadata": {
+        "description": "Hostname for the machine."
+      }
+    },
+    "windowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2016-Datacenter",
+      "allowedValues": [
+        "2008-R2-SP1",
+        "2012-Datacenter",
+        "2016-Datacenter"
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM. This will pick a fully patched image of this given Windows version. Allowed values: 2008-R2-SP1, 2012-Datacenter, 2012-R2-Datacenter."
+      }
+    },
+    "centralNode": {
+      "type": "string",
+      "metadata": {
+        "description": "Host name of the central node."
+      }
+    },
+    "nodeType": {
+      "type": "string",
+      "defaultValue": "All",
+      "allowedValues": [
+        "Proxy",
+        "ProxyEngine",
+        "Engine",
+        "Scheduler",
+        "All"
+      ],
+      "metadata": {
+        "description": "The services to activate on the node."
+      }
+    },
+    "_artifactsLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
+      }
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Auto-generated token to access _artifactsLocation"
+      },
+      "defaultValue": ""
+    }
+  },
+  "variables": {
+    "vmName": "[parameters('hostname')]",
+    "SenseSetupArchiveFolder": "dsc",
+    "SenseSetupArchiveFileName": "SenseSetup.zip",
+    "BaseResourcesTemplateFolder": "nestedtemplates",
+    "BaseResourcesTemplateFileName": "BaseResources.json"
+  },
+  "resources": [
+    {
+      "name": "[concat(variables('vmName'), '-BaseResources')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2016-09-01",
+      "dependsOn": [],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(parameters('_artifactsLocation'), '/', variables('BaseResourcesTemplateFolder'), '/', variables('BaseResourcesTemplateFileName'), parameters('_artifactsLocationSasToken'))]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "virtualMachineName": {
+            "value": "[variables('vmName')]"
+          },
+          "adminUsername": {
+            "value": "[parameters('adminUsername')]"
+          },
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "dnsNameForPublicIP": {
+            "value": "[parameters('dnsNameForPublicIP')]"
+          },
+          "windowsOSVersion": {
+            "value": "[parameters('windowsOSVersion')]"
+          },
+          "_artifactsLocation": {
+            "value": "[parameters('_artifactsLocation')]"
+          },
+          "_artifactsLocationSasToken": {
+            "value": "[parameters('_artifactsLocationSasToken')]"
+          }
+        }
+      }
+    },
+    {
+      "name": "[concat(variables('vmName'), '/Microsoft.Powershell.DSC')]",
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[concat(variables('vmName'), '-BaseResources')]"
+      ],
+      "tags": {
+        "displayName": "SenseSetup"
+      },
+      "properties": {
+        "publisher": "Microsoft.Powershell",
+        "type": "DSC",
+        "typeHandlerVersion": "2.9",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "configuration": {
+            "url": "[concat(parameters('_artifactsLocation'), '/', variables('SenseSetupArchiveFolder'), '/', variables('SenseSetupArchiveFileName'))]",
+            "script": "SenseSetup.ps1",
+            "function": "Main"
+          },
+          "configurationArguments": {
+            "Hostname": "[variables('vmName')]",
+            "CentralNode": "[parameters('centralNode')]",
+            "ClusterShareHost": "[parameters('centralNode')]",
+            "NodeType": "[parameters('nodeType')]"
+          }
+        },
+        "protectedSettings": {
+          "configurationArguments": {
+            "SenseService": {
+              "userName": "[concat(variables('vmName'), '\\', parameters('serviceUsername'))]",
+              "password": "[parameters('servicePassword')]"
+            },
+            "QlikAdmin": {
+              "userName": "[concat(variables('vmName'), '\\', parameters('adminUsername'))]",
+              "password": "[parameters('adminPassword')]"
+            }
+          },
+          "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]"
+        }
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

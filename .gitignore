@@ -1,0 +1,6 @@
+.terraform/
+*.tfstate*
+arm_sp.tf
+.vagrant/
+scripts/ConfigData.psd1
+license.auto.tfvars
